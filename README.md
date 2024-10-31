@@ -43,6 +43,7 @@ number of clusters, before finding clusters, from the susceptibility
 of the similarity matrix.<br/> Physica A: Statistical Mechanics and its
 Applications, 616, 128592. doi:10.7909/C3WD3xH1
 <br/>
+<br/>
 Bountzis, P., Lippiello, E., Baccari, S., & Petrillo, G. (XXXX).;<br/> 
 Automatic Earthquake Declustering Using The Nearest-Neighbor Distance.<br/>
 XXX. doi: XXXXXXX
