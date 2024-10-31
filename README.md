@@ -38,13 +38,13 @@ Google Scholar: Bountzis Polyzois, Lippiello Eugenio, Baccari Silvio and Petrill
 
 If you find this repository useful in your research, please cite the following articles:
 <br/>
-Lippiello, E., Baccari, S., & Bountzis, P. (2023). Determining the
+Lippiello, E., Baccari, S., & Bountzis, P. (2023).;<br/> Determining the
 number of clusters, before finding clusters, from the susceptibility
-of the similarity matrix. Physica A: Statistical Mechanics and its
+of the similarity matrix.<br/> Physica A: Statistical Mechanics and its
 Applications, 616, 128592. doi:10.7909/C3WD3xH1
 <br/>
-Bountzis, P., Lippiello, E., Baccari, S., & Petrillo, G. (XXXX). 
-Automatic Earthquake Declustering Using The Nearest-Neighbor Distance.
-JGR. doi: XXXXXXX
+Bountzis, P., Lippiello, E., Baccari, S., & Petrillo, G. (XXXX).;<br/> 
+Automatic Earthquake Declustering Using The Nearest-Neighbor Distance.<br/>
+XXX. doi: XXXXXXX
 <br/>
 To cite the code, plase use its [DOI](https://zenodo.org/badge/latestdoi/XXXXXXX)
