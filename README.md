@@ -48,4 +48,3 @@ Automatic Earthquake Declustering Using The Nearest-Neighbor Distance.<br/>
 XXX. doi: XXXXXXX
 <br/>
 <br/>
-To cite the code, plase use its [DOI](https://zenodo.org/badge/latestdoi/XXXXXXX)
