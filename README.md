@@ -30,8 +30,6 @@ Please feel free to contact us for any questions or cooperation opportunities. W
 <br/>
 Email: pmpountzp@geo.auth.gr, Eugenio.LIPPIELLO@unicampania.it, silvio.baccari@gmail.com or giuseppe51289@gmail.com <br/>
 <br/>
-GitHub: Bountzis Polyzois, Baccari Silvio and Petrillo Giuseppe <br/>
-<br/>
 Google Scholar: Bountzis Polyzois, Lippiello Eugenio, Baccari Silvio and Petrillo Giuseppe
 <br/>
 #### Citation
