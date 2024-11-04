@@ -12,7 +12,7 @@ _Physica A_; doi: https://doi.org/10.1016/j.physa.2023.128592<br/>
 ### The earthquake declustering problem is described in:
 
 Polyzois Bountzis, Eugenio Lippiello, Silvio Baccari, Giueseppe Petrillo 202X;<br/>Automatic Earthquake Declustering Using The Nearest-Neighbor Distance.<br/>
-_JGR_; doi: https://doi.org/XXXXXXX<br/>
+<br/>
 <br/>
 
 This repository introduces how to use the Susceptibility Index for earthquake declustering. Pre-processing tools are included to prepare the datasets.
@@ -20,8 +20,6 @@ This repository introduces how to use the Susceptibility Index for earthquake de
 <br/>
 Synthetic catalogs can be produced via the ETAS model. Details in the folder ETAS simulations.
 <br/>
-<br/>
-Other declustering tools (ETAS stochastic declustering,...) can be found in the folder Declustering Tools.
 <br/>
 #### Contact Info
 
