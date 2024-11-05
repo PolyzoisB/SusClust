@@ -1,5 +1,5 @@
-# Automatic Earthquake Declustering with Susceptibility Index
-This repository contains the code for the project "Determining the number of clusters using the Similarity Matrix".
+# Automatic Earthquake Declustering
+This repository contains the code for the project "Automatic Earthquake Declustering with the Susceptibility Index".
 The code and proposed algorithm can be used in any type of dataset. For this project, two papers have been published:
 
 ### This code was written for the following articles:
