@@ -12,11 +12,11 @@ program susceptibility_index
     
     !!!!! File Processing variables !!!!!
     !! Spatial boundaries need to be defined a-priori - Magnitude is not filtered
-    character(len=*), parameter :: input_file = 'datasets/input_catalog.txt'
-    character(len=500), parameter :: rescaled_dist = 'results/rescaled_distances.txt'
-    character(len=256), parameter :: susc_index_file_name = 'results/susc_index.txt'
-    character(len=256), parameter :: output_cat='results/output_catalog.txt'
-    character(len=256), parameter ::final_results='results/final_results.txt'
+    character(len=*), parameter :: input_file = 'datasets/sc_conv_1981_31_3_2022_mth2.5_cl.txt'
+    character(len=500), parameter :: rescaled_dist = 'results/rescaled_distances2.txt'
+    character(len=256), parameter :: susc_index_file_name = 'results/susc_index2.txt'
+    character(len=256), parameter :: output_cat='results/output_catalog2.txt'
+    character(len=256), parameter ::final_results='results/final_results2.txt'
     
     !!!!! Catalog variables !!!!!
     integer, parameter :: max_events = 2000000,max_thr = 6000
@@ -40,11 +40,13 @@ program susceptibility_index
     integer :: k(max_points),kmin_shft,kmin,kmax,kmax2
   
     !!!!! METRICS !!!!
-    real*8 :: dt2,dr2,maxdt(max_events),maxdr(max_events)
+    real*8 :: dt2,dr2,maxdt(max_events),maxdr(max_events),prc
     integer :: id(max_events),id_pr(max_events),ip_thr
 
     !!!!! Counter variables !!!!
     integer :: unit_number
+    integer :: start_clock, end_clock, rate
+    real(8) :: elapsed_time,total_time
     
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     !!!                        IMPORT DATA                             !!!
@@ -52,16 +54,18 @@ program susceptibility_index
     open(35,file=input_file,status='old')
     
     jj=0
-    do ii=1,1000000
+    do ii=1,max_events
       ! elapsed times since To (seconds),longitude (deg), latitude (deg), magnitude
       read(35,*,end=199)t,x,y,qe
-      if(t.gt.0.and.qe.ge.mcut) then
+      if(t.gt.0) then
+         if(qe.ge.mcut)then
             jj=jj+1
             xxe(jj)=x
             yye(jj)=y
             time(jj)=t
             mag(jj)=qe
-        end if
+         endif
+      end if
     enddo
     199 close(35)
     n_event = jj-1
@@ -84,7 +88,24 @@ program susceptibility_index
     enddo
     unit_number = 85
     open (unit_number,file=rescaled_dist,status="replace",action="write") 
-    do i=2,n_event
+    prc = 0.025
+    ! Get the clock rate and start time
+    elapsed_time = 0.
+    call SYSTEM_CLOCK(start_clock, rate)
+    do i=2,n_event  
+      if (i / real(n_event) >= prc)then
+         ! Get the end time
+         call SYSTEM_CLOCK(end_clock)
+         ! Calculate elapsed time
+         elapsed_time = real(end_clock - start_clock, 8) / rate + elapsed_time
+         total_time = elapsed_time / prc 
+         write(15,*) prc, i, n_event, total_time - elapsed_time
+         prc = prc + 0.025
+         print*,prc,i
+         call flush(15)
+         ! Get the clock rate and start time
+         call SYSTEM_CLOCK(start_clock, rate)
+      end if
       ixxx=xxe(i)
       iyyy=yye(i)
       ipmaxt = ipmin
@@ -110,7 +131,8 @@ program susceptibility_index
        enddo
     enddo
     close(unit_number)
-
+    close(15)
+   pause
 
    !**********Compute and export the Susceptibility Index *************!
    unit_number = 86
