@@ -42,7 +42,7 @@ program susceptibility_index
   
     !!!!! METRICS !!!!
     real*8 :: dt2,dr2,maxdt(max_events),maxdr(max_events)
-    integer :: id(max_events),id_pr(max_events),ip_thr
+    integer :: id(max_events),id_pr(max_events),ip_thr,prc
 
     !!!!! Counter variables !!!!
     integer :: unit_number
@@ -59,16 +59,16 @@ program susceptibility_index
 
     ! Read data and parse time
     jj=0
-    do ii=1,2000000
+    do ii=1,max_events
       ! year,month,day,hour,min,sec, longitude (deg), latitude (deg), depth, magnitude
       read(35,*,end=199)t1,t2,t3,t4,t5,t6,x,y,d,qe
-      if(qe.ge.mcut) then
+      !if(qe.ge.mcut) then
             jj=jj+1
             xxe(jj)=x
             yye(jj)=y
             times(jj)=date_to_seconds(t1,t2,t3,t4,t5,t6)
             mag(jj)=qe
-        end if
+       ! end if
     enddo
     199 close(35)
     n_event = jj-1
@@ -100,7 +100,14 @@ program susceptibility_index
     enddo
     unit_number = 85
     open (unit_number,file=rescaled_dist,status="replace",action="write") 
+    prc = 0.025
     do i=2,n_event
+      if (i / real(n_event) >= prc)then
+         write(15,*) prc, i, n_event
+         prc = prc + 0.025
+         print*,prc,i
+         call flush(15)
+      end if
       ixxx=xxe(i)
       iyyy=yye(i)
       ipmaxt = ipmin
@@ -118,7 +125,7 @@ program susceptibility_index
             enddo 
        enddo
        
-       !write(unit_number,*)maxdt(i),maxdr(i)
+       write(unit_number,*)maxdt(i),maxdr(i)
        nd(ipmaxt) = nd(ipmaxt)+1
        id_pr(i) = ipmaxt
        do ip=ipmaxt+1,ipmax
@@ -401,6 +408,7 @@ program susceptibility_index
 
    ! Function to convert date and time to seconds
    real(8) function date_to_seconds(yy, mm, dd, hh, mins, ss)
+    ! Computes the seconds since 1970 (Julian date transformation)
     integer, intent(in) :: yy, mm, dd, hh, mins
     real(8), intent(in) :: ss
     integer :: days_in_months(12) = (/ 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 /)
