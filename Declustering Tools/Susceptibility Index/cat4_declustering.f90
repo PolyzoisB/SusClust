@@ -12,11 +12,11 @@ program susceptibility_index
     
     !!!!! File Processing variables !!!!!
     !! Spatial boundaries need to be defined a-priori - Magnitude is not filtered
-    character(len=*), parameter :: input_file = 'datasets/sc_conv_1981_31_3_2022_mth2.5_cl.txt'
-    character(len=500), parameter :: rescaled_dist = 'results/rescaled_distances2.txt'
-    character(len=256), parameter :: susc_index_file_name = 'results/susc_index2.txt'
-    character(len=256), parameter :: output_cat='results/output_catalog2.txt'
-    character(len=256), parameter ::final_results='results/final_results2.txt'
+    character(len=*), parameter :: input_file = 'datasets/input_data.txt'
+    character(len=500), parameter :: rescaled_dist = 'results/rescaled_distances.txt'
+    character(len=256), parameter :: susc_index_file_name = 'results/susc_index.txt'
+    character(len=256), parameter :: output_cat='results/output_catalog.txt'
+    character(len=256), parameter ::final_results='results/final_results.txt'
     
     !!!!! Catalog variables !!!!!
     integer, parameter :: max_events = 2000000,max_thr = 6000
@@ -55,7 +55,7 @@ program susceptibility_index
     
     jj=0
     do ii=1,max_events
-      ! elapsed times since To (seconds),longitude (deg), latitude (deg), magnitude
+      ! elapsed times since origin (seconds),longitude (deg), latitude (deg), magnitude
       read(35,*,end=199)t,x,y,qe
       if(t.gt.0) then
          if(qe.ge.mcut)then
@@ -66,7 +66,7 @@ program susceptibility_index
             mag(jj)=qe
          endif
       end if
-    enddo
+    end do
     199 close(35)
     n_event = jj-1
     print*, "Number of events",n_event
@@ -85,7 +85,7 @@ program susceptibility_index
        nlink(ip)=0
        kr(ip)=0
        nd(ip)=0
-    enddo
+    end do
     unit_number = 85
     open (unit_number,file=rescaled_dist,status="replace",action="write") 
     prc = 0.025
@@ -112,6 +112,11 @@ program susceptibility_index
       do j=i-1,1,-1
             ! Compute similarity sij
             call metric(l1,ixxx,iyyy,time(i),xxe(j),yye(j),time(j),mag(j),dt2,dr2)
+            if(int(dlog(l1)/bin0).lt.ipmin.or.int(dlog(l1)/bin0).gt.ipmax)then 
+               print*,int(dlog(l1)/bin0),'WARNING change limits'
+               print*,l1,ixxx,iyyy,time(i),xxe(j),yye(j),time(j),mag(j),dt2,dr2,i,j
+               pause
+            endif
             ipf=max(ipmin,int(log(l1)/bin0)) ! find m1: sth(m1)>sij>sth(m1+1)    
             if(ipf.gt.ipmaxt)then
                 maxdt(i)=dt2
@@ -120,16 +125,16 @@ program susceptibility_index
             ipmaxt=max(ipf,ipmaxt)           ! find the maximum similarity s_i(max)  
             do ip=ipmin,ipf
                 nlink(ip)=nlink(ip)+1
-            enddo 
-       enddo
+            end do 
+       end do
        
        write(unit_number,*)maxdt(i),maxdr(i)
        nd(ipmaxt) = nd(ipmaxt)+1
        id_pr(i) = ipmaxt
        do ip=ipmaxt+1,ipmax
         kr(ip)=kr(ip)+1                      ! no links for sth>s_i(max)
-       enddo
-    enddo
+       end do
+    end do
     close(unit_number)
     close(15)
    pause
@@ -150,7 +155,7 @@ program susceptibility_index
          !                 "Clusters",    "Susc index",      "NN" ,  "Threshold", "Thr index", "No links"
          write(unit_number,*)kr(ip)  ,  sindex(num_points), nd(ip),  exp(ip*bin0),    ip     ,  nlink(ip)
       endif    
-   enddo
+   end do
    close(unit_number)
 
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -202,19 +207,24 @@ program susceptibility_index
         !real*8 :: cc,pp,K,a,gamma,dd,q,qc,espo,fdr,dm,l1
 
         dt0 = 1    ! 1 sec
-        dr0 = 1E-5 ! in degrees (~1mt)
-        !dr0 = 0.01  ! in km
+        dr0 = 1E-3 ! in degrees 
+        
+        if(x1.eq.x3.and.y1.eq.y3)then
+           x3=x3+dr0
+           y3=y3+dr0
+        endif
+
+        !! Convert degrees to radians
+        lat1 = x1
+        lat2 = x3
+        lon1 = y1
+        lon2 = y3
+        phi1 = lat1 * pr
+        phi2 = lat2 * pr
+        lambda1 = lon1 * pr
+        lambda2 = lon2 * pr
         
         !! Harvesine distance !!
-        !! Convert degrees to radians
-         ! lat1 = x1
-         ! lat2 = x3
-         ! lon1 = y1
-         ! lon2 = y3
-         ! phi1 = lat1 * pr
-         ! phi2 = lat2 * pr
-         ! lambda1 = lon1 * pr
-         ! lambda2 = lon2 * pr
          ! ! Calculate differences
          ! dphi = phi2 - phi1
          ! dlambda = lambda2 - lambda1
@@ -223,14 +233,21 @@ program susceptibility_index
          ! dr = 2.0d0 * asin(sqrt(a))   ! angular distance in radians
          ! ! dr = dr * (1 / pr)         ! in degrees
          ! dr=dr*6370                   ! in km
-      
+        
+        !! Distance !!
+         dr = acos(sin(phi1)*sin(phi2)+cos(phi1)*cos(phi2)&
+               *cos(lambda1-lambda2))
+         dr = dr * 6370. ! in km
+         dr = dr * 1000. ! in mt
+        
         !! Euclidean distance !!
-        dr=sqrt((x1-x3)**2+(y1-y3)**2) ! euclidean distance
+        !dr=sqrt((x1-x3)**2+(y1-y3)**2) ! euclidean distance
         
         ! Temporal distance
         dt=(t1-t3)
 
         flag1 = 0
+        dr0 = 10 ! mt
         if(dr.eq.0.or.dt.eq.0)flag1=1
         dt = dt+dt0*flag1
         dr = dr+dr0*flag1
@@ -238,29 +255,13 @@ program susceptibility_index
         !!!! Baiesi-Paszuski metric !!!!
         df = 1.6   ! fractal dimension
         bval = 1.0 ! b-value
-        prob=1/(dt*(dr**df)*10**(-bval*q3)) ! similarity
-        dt2 = dt*(10**(-bval*q3*0.5))
-        dr2 = (dr**df)*(10**(-bval*q3*0.5))
+        prob=1/(dt*(dr**df)*10**(-bval*q3)) ! similarity in sec*mt
+        !dt2 = dt*(10**(-bval*q3*0.5))                     ! in seconds
+        dt2 = (dt/(365.25*24.*3600.))*(10**(-bval*q3*0.5)) ! in years
+        !dr2 = (dr**df)*(10**(-bval*q3*0.5))               ! in mt
+        dr = dr / 1000.
+        dr2 = (dr**df)*(10**(-bval*q3*0.5))                ! in km
         aaa=prob
-
-        !!!! ETAS metric !!!!
-        ! Pi=4d0*atan(1.)
-        ! prad=Pi/180.
-        ! cc=0.024 !(days)
-        ! pp=1.2
-        ! K = 0.155
-        ! a= 0.9 
-        ! gamma = 0.45
-        ! DD = 225 ! mt^2
-        ! q = 1.3
-        ! qc = 2.5
-        ! espo = 10**(a*(q3-qc))
-        ! dm=DD*10**(gamma*(q3-qc))
-        ! fdr=(dr+dm)**(-q)*(dm**(q-1))
-        ! l1=espo*(dt+cc)**(-pp)*fdr
-        ! prob=l1*K*(cc**(pp-1))*(pp-1)*(q-1)
-        ! aaa = prob
-    
    end subroutine metric
 
    subroutine min_ssm_shft(num_points,sindex,k,kmin_shft,zmin_shft,sw,z_max1,z_max2,z_min,kmin,zmax1,kmax,zmax2,&
