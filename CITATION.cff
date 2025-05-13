@@ -1,0 +1,20 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+authors:
+- family-names: "Bountzis"
+  given-names: "Polyzois"
+  orcid: "https://orcid.org/0000-0001-5422-3531"
+- family-names: "Lippiello"
+  given-names: "Eugenio"
+  orcid: "https://orcid.org/0000-0003-1444-1889"
+- family-names: "Baccari"
+  given-names: "Silvio"
+  orcid: "https://orcid.org/0000-0002-5569-0585"
+- family-names: "Petrillo"
+  given-names: "Giuseppe"
+  orcid: "https://orcid.org/0000-0002-2339-559X"
+title: "Automatic Earthquake Declustering Using The Nearest-Neighbor Distance"
+version: 1.0.0
+doi: 10.5281/zenodo.15394843
+date-released: 2025-5-13
+url: "https://github.com/PolyzoisB/SusClust"
