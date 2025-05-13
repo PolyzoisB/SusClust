@@ -30,6 +30,6 @@ Applications, 616, 128592. doi:*[10.1016/j.physa.2023.128592](https://doi.org/10
 <br/>
 Bountzis, P., Lippiello, E., Baccari, S., & Petrillo, G. (XXXX).;<br/> 
 Automatic Earthquake Declustering Using The Nearest-Neighbor Distance.<br/>
-XXX. doi: XXXXXXX
+under review
 <br/>
 <br/>
