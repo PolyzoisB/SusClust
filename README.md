@@ -1,28 +1,25 @@
 # Automatic Earthquake Declustering
+<br/>
 This repository contains the code for the project "Automatic Earthquake Declustering with the Susceptibility Index".
-The code and proposed algorithm can be used in any type of dataset. For this project, two papers have been published:
-
-### This code was written for the following articles:
-
+The algorithm and code are general and can be adapted to other types of datasets with appropriate modifications. This work is associated with two research articles:
+<br/>
+### Publications:
+<br/>
 Eugenio Lippiello, Polyzois Bountzis, Silvio Baccari 2023;<br/>Determining the number of clusters, before finding clusters,
 from the susceptibility of the similarity matrix.<br/>
 _Physica A_; doi: https://doi.org/10.1016/j.physa.2023.128592<br/>
 <br/>
-
-### The earthquake declustering problem is described in:
-
-Polyzois Bountzis, Eugenio Lippiello, Silvio Baccari, Giueseppe Petrillo 202X;<br/>Automatic Earthquake Declustering Using The Nearest-Neighbor Distance.<br/>
+### Project Overview:
 <br/>
 <br/>
-
-This repository introduces how to use the Susceptibility Index for earthquake declustering. Pre-processing tools are included to prepare the datasets.
+This repository demonstrates how to use the Susceptibility Index for automatic earthquake declustering. It includes pre-processing tools to prepare earthquake catalogs, along with an implementation of the algorithm.
 <br/>
 <br/>
-Synthetic catalogs can be produced via the ETAS model. Details in the folder ETAS simulations.
+Additionally, you can generate simulated earthquake catalogs using the ETAS (Epidemic-Type Aftershock Sequence) model. See the ETAS simulations folder for details.
 <br/>
 <br/>
 #### Contact Info
-
+<br/>
 Please feel free to contact us for any questions or cooperation opportunities. We will be happy to help.
 <br/>
 <br/>
