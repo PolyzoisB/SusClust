@@ -12,7 +12,7 @@ program susceptibility_index
     
     !!!!! File Processing variables !!!!!
     !! Spatial boundaries need to be defined a-priori - Magnitude is not filtered
-    character(len=*), parameter :: input_file = 'datasets/input_data.txt'
+    character(len=*), parameter :: input_file = 'datasets/input_catalog.txt'
     character(len=500), parameter :: rescaled_dist = 'results/rescaled_distances.txt'
     character(len=256), parameter :: susc_index_file_name = 'results/susc_index.txt'
     character(len=256), parameter :: output_cat='results/output_catalog.txt'
