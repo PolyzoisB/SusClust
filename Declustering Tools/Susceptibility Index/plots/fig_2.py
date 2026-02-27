@@ -1,61 +1,61 @@
-import matplotlib.pyplot as plt
-import pandas as pd
 import numpy as np
-from scipy.io import loadmat
-from datetime import datetime
-from sklearn.linear_model import LinearRegression
+import pandas as pd
+import matplotlib.pyplot as plt
 
-#################### LOAD output catalog #####################
-file_path = '../results/output_catalog.txt'
 
-df = pd.read_csv(file_path,sep=r'\s+',engine='python',header=None)
-df.columns=['time', 'lat', 'lon','mag','bg_id']
-df = pd.DataFrame(df).astype(float)
-bg = df[df['bg_id']==0]
-main = df[df['mag']>=6]
+SECONDS_PER_YEAR = 365.25 * 24 * 3600
 
-# Convert date and time columns to datetime objects
-dt3 = bg['time']/(3600*24*365)
-quake3 = list(range(1, len(dt3) + 1))
 
-dt4 = df['time']/(3600*24*365)
-quake4 = list(range(1, len(dt4) + 1))
+# -------------------- Load output catalog --------------------
+df = pd.read_csv("../results/output_catalog.txt", sep=r"\s+", header=None, engine="python")
+df.columns = ["time", "lat", "lon", "mag", "bg_id"]
+df = df.astype(float)
 
-prc_bg = np.round((len(bg) / len(df))*100,2)
-################# FIGURE ##########################################################
-plt.rcParams.update({'font.size': 16})
+bg = df[df["bg_id"] == 0]
+main = df[df["mag"] >= 6]
+
+t_all_years = df["time"].values / SECONDS_PER_YEAR
+t_bg_years = bg["time"].values / SECONDS_PER_YEAR
+
+cum_all = np.arange(1, len(df) + 1)
+cum_bg = np.arange(1, len(bg) + 1)
+
+prc_bg = np.round((len(bg) / len(df)) * 100, 2) if len(df) > 0 else 0.0
+
+
+# -------------------- Plot --------------------
+plt.rcParams.update({"font.size": 14})
 
 fig, axes = plt.subplots(2, 1, figsize=(16, 10), sharex=True, dpi=400)
-fig.patch.set_facecolor('white')
+fig.patch.set_facecolor("white")
 
-ax3=axes[0]
-ax3.set_facecolor((0.7, 0.7, 0.7))
-ax3.plot(dt4, df['lat'], 'o', markersize=2, markerfacecolor='cyan')
-ax3.plot(main['time']/(3600*24*365), main['lat'], 'o', markersize=8,
-         markerfacecolor='red',markeredgecolor='black')
-ax3.set_ylim([min(df['lat']), max(df['lat'])])
-ax3.set_xlim([min(dt4), max(dt4)])
-ax3.set_ylabel('Latitude', fontsize=14)
-ax3.set_title('Initial Catalog')
+# Panel A: initial catalog
+ax1 = axes[0]
+ax1.set_facecolor((0.7, 0.7, 0.7))
+ax1.plot(t_all_years, df["lat"].values, "o", markersize=2, markerfacecolor="cyan", markeredgecolor="none")
+ax1.plot(main["time"].values / SECONDS_PER_YEAR, main["lat"].values, "o",
+         markersize=8, markerfacecolor="red", markeredgecolor="black")
 
-ax3_right = ax3.twinx()
-ax3_right.plot(dt4, quake4, linewidth=1.5,color='m')
-ax3_right.set_ylabel('Cum. Num.', fontsize=14)
+ax1.set_ylabel("Latitude")
+ax1.set_title("Initial Catalog")
 
-ax4=axes[1]
-ax4.set_facecolor((0.7, 0.7, 0.7))
-ax4.plot(dt3, bg['lat'], 'o', markersize=1, color='k')
-ax4.plot(main['time']/(3600*24*365), main['lat'], 'o', markersize=8,
-         markerfacecolor='red',markeredgecolor='black')
+ax1r = ax1.twinx()
+ax1r.plot(t_all_years, cum_all, linewidth=1.5, color="m")
+ax1r.set_ylabel("Cum. Num.")
 
-ax4.set_ylim([min(bg['lat']), max(bg['lat'])])
-ax4.set_xlim([min(dt4), max(dt4)])
-ax4.set_title('Susceptibility-Based Declustering 'f'{prc_bg}'r'$\%$' ' bg events')
-ax4.set_xlabel('Time since origin (in years)', fontsize=14)
-ax4.set_ylabel('Latitude', fontsize=14)
+# Panel B: background (declustered)
+ax2 = axes[1]
+ax2.set_facecolor((0.7, 0.7, 0.7))
+ax2.plot(t_bg_years, bg["lat"].values, "o", markersize=1, color="k")
+ax2.plot(main["time"].values / SECONDS_PER_YEAR, main["lat"].values, "o",
+         markersize=8, markerfacecolor="red", markeredgecolor="black")
 
-ax4_right = ax4.twinx()
-ax4_right.plot(dt3, quake3, linewidth=1.5,color='m')
-ax4_right.set_ylabel('Cum. Num.', fontsize=14)
+ax2.set_title(f"Susceptibility-Based Declustering ({prc_bg}% background events)")
+ax2.set_xlabel("Time since origin (years)")
+ax2.set_ylabel("Latitude")
 
-plt.savefig('Fig_2.png',bbox_inches='tight',dpi=400)
+ax2r = ax2.twinx()
+ax2r.plot(t_bg_years, cum_bg, linewidth=1.5, color="m")
+ax2r.set_ylabel("Cum. Num.")
+
+plt.savefig("Fig_2.png", bbox_inches="tight", dpi=400)
