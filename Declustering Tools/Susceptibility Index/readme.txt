@@ -59,7 +59,7 @@ Threshold	→ Similarity threshold value
 ip → Log-bin index
 nlinks → Total number of links at that threshold
 Units:
-Threshold → 1 / (seconds × km^df × 10^(-bM))
+Threshold → 1 / (seconds × meters^df × 10^(-bM))
 Purpose:
 Defines the susceptibility curve versus similarity threshold
 3. final_results.txt --> kmin_shft, zmin_shft, thresh(kmin_shft), kmin, z_min, thresh(kmin), kmax, thresh(kmax), kmax2, thresh(kmax2)
