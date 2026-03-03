@@ -4,8 +4,8 @@ program susceptibility_index
 !    1. Import data with format [time, longitude, latitude, magnitude]                            !
 !    2. Compute Susceptibility index                                                              !
 !    3. Compute the minimum with smoothing algorithm                                              !                
-!    4. Exports i) The catalog ii) Susceptibility index iii) Smoothing algorithm details          !
-!               iv) rescaled distances                                                            !
+!    4. Exports i) Declustered catalog             ii) Susceptibility index                       ! 
+!               iii) Smoothing algorithm minimum   iv) Rescaled Distances                         !
 !*************************************************************************************************!
   use global_parameters
   implicit none
@@ -128,8 +128,8 @@ program susceptibility_index
       k(num_points) = kr(ip)                         ! Number of clusters
       zmexp=(kr(ip)-kr(ip-smooth_step))*1d0/(nlink(ip-smooth_step)-nlink(ip))
       sindex(num_points) = zmexp*nlink(ip)*1./n_event ! SSM index
-      thresh(kr(ip)) =  exp(ip*bin0)
-      !                 "Clusters",    "Susc index",      "NN" ,  "Threshold (sec*km)", "Thr index", "No links"
+      thresh(kr(ip)) =  exp(ip*bin0)                  ! Similarity threshold
+      !                 "Clusters",    "Susc index",      "NN" ,  "Threshold (years*km)", "Thr index", "No links"
       write(unit_number,*)kr(ip)  ,  sindex(num_points), nd(ip),  exp(ip*bin0),    ip     ,  nlink(ip)
     endif    
   enddo
@@ -173,11 +173,11 @@ program susceptibility_index
 
   contains
 
-   subroutine metric(aaa,x1,y1,t1,x3,y3,t3,q3,dt2,dr2)
+   subroutine metric(aaa,x1,y1,t1,x3,y3,t3,q3,dt_resc,dr_resc)
       use global_parameters
       implicit none
 
-      real(8) :: aaa, dr, prob, dt, dt0, dt2, dr2
+      real(8) :: aaa, dr, prob, dt, dt0, dt_resc, dr_resc
       real(8) :: x1,y1,t1,x3,y3,t3,q3
       real(8) :: pr, dr0
       real(8) :: lat1,lat2,lon1,lon2,phi1,phi2,lambda1,lambda2
@@ -205,21 +205,20 @@ program susceptibility_index
 
       dr = acos(sin(phi1)*sin(phi2)+cos(phi1)*cos(phi2)*cos(lambda1-lambda2))
       dr = dr * 6370.d0      ! km
-      dr = dr * 1000.d0      ! meters
 
       dt = (t1 - t3)
 
       flag1 = 0
       dr0 = 10.d0
       if(dr.eq.0.d0.or.dt.eq.0.d0)flag1=1
-      dt = dt + dt0*flag1
+      dt = (dt + dt0*flag1)/(365.25d0*24.d0*3600.d0) ! years
       dr = dr + dr0*flag1
-
+      ! 1/(years*km^df)
       prob = 1.d0/(dt*(dr**df)*10.d0**(-bval*q3))
 
-      dt2 = (dt/(365.25d0*24.d0*3600.d0))*(10.d0**(-bval*q3*0.5d0))
-      dr  = dr/1000.d0
-      dr2 = (dr**df)*(10.d0**(-bval*q3*0.5d0))
+      ! Rescale dt and dr
+      dt_resc = dt*(10.d0**(-bval*q3*0.5d0))
+      dr_resc = (dr**df)*(10.d0**(-bval*q3*0.5d0))
 
       aaa = prob
 
