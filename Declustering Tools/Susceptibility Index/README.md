@@ -95,8 +95,8 @@ Notes:
 
 ### 1) `results/rescaled_distances.txt`
 Two columns per event (except the first event):
-- `maxdt(i)`: rescaled time distance
-- `maxdr(i)`: rescaled spatial distance
+- `maxdt(i)`: rescaled time distance in years
+- `maxdr(i)`: rescaled spatial distance in km
 
 These are associated with the **strongest link** of each event (largest similarity).
 
@@ -105,7 +105,7 @@ Columns:
 1. `K` — number of clusters
 2. `SI` — susceptibility index value
 3. `NN` — histogram count of strongest-link bins
-4. `Threshold` — similarity threshold value
+4. `Threshold` — similarity threshold value in 1/(years*km^df)
 5. `ThresholdIndex` — log-bin index (`ip`)
 6. `Nlinks` — total number of links at that threshold
 
