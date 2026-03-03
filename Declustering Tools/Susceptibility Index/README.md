@@ -142,4 +142,12 @@ Edit `global_parameters.f90`:
 - If you change the input format, update both the input file and the reading logic in `main_program.f90`.
 
 ## Citation
-If you use this tool in research, please cite the associated SusClust method/publication (add reference here).
+If you use this tool in research, please cite the associated publications
+
+Lippiello, E., Baccari, S., & Bountzis, P. (2023).;
+Determining the number of clusters, before finding clusters, from the susceptibility of the similarity matrix.
+Physica A: Statistical Mechanics and its Applications, 616, 128592. doi:10.1016/j.physa.2023.128592
+
+Bountzis, P., Lippiello, E., Baccari, S., & Petrillo, G. (2026).;
+Automatic earthquake declustering using the nearest-neighbor distance.
+Earth and Space Science, 13, e2025EA004539.
