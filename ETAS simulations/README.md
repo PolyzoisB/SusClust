@@ -55,11 +55,6 @@ If your files have different columns/order, update `load_bg_coords()` accordingl
 From inside `ETAS_simulations/`:
 
 ```bash
-gfortran -O3 global_parameters.f90 main_program.f90 -o etas_ssm.out
-```
-
-If you need additional sources (e.g., `randgen.f` that defines `ZBQLPOI`), include them:
-```bash
 gfortran -O3 global_parameters.f90 main_program.f90 randgen.f -o etas_ssm.out
 ```
 
