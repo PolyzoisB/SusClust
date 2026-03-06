@@ -1,0 +1,7 @@
+ Kbest         3649 SI   0.11562516169876469     
+ Similarity threshold 1. (years*km) 2. (sec*mt)   20327.569806856569        1.0208957924491210E-008
+ Distance threshold (years*km)   4.9194272089657076E-005
+ Kmin         6019 SI   0.10061836248081799     
+ Similarity threshold 1. (years*km) 2. (sec*mt)   1226571.4832382663        6.1601149486824105E-007
+ K for left peak:         1904 Similarity threshold for left peak:    7.9713241259054149E-010 SI   0.24361162501626468     
+ K for right peak:         7212 Similarity threshold for right peak:    3.3720146010277666E-006 SI   0.10187497224192221     

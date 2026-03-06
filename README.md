@@ -7,7 +7,7 @@ This repository includes:
 <br/>
 <br/>
  - ``` Data/ ``` containing the catalogs of Southern California and New Zealand used in our study;
- - ``` Declustering Tools/ ``` containing the stochastic earthquake declustering algorithm and the algorithm that uses the Susceptibility Index for earthquake declustering;
+ - ``` Susceptibility Index/ ``` containing the stochastic earthquake declustering algorithm and the algorithm that uses the Susceptibility Index for earthquake declustering;
  - ``` ETAS simulations/ ``` contains the code for generating ETAS catalogs;
  - ``` Preprocess_tools/ ``` contains useful tools to prepare earthquake catalogs.
 ## Contact Info
