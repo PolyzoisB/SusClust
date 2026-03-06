@@ -2,13 +2,12 @@
 This repository contains the code for the project "Automatic Earthquake Declustering with the Susceptibility Index".
 The algorithm and code are general and can be adapted to other types of datasets with appropriate modifications.
 ## Project Overview
-This repository demonstrates how to use the Susceptibility Index for automatic earthquake declustering. It includes pre-processing tools to prepare earthquake catalogs, along with an implementation of the algorithm. Additionally, you can generate simulated earthquake catalogs using the ETAS (Epidemic-Type Aftershock Sequence) model and perform stochastic declustering. 
+This repository demonstrates how to use the Susceptibility Index for automatic earthquake declustering. It includes pre-processing tools to prepare earthquake catalogs, along with an implementation of the algorithm. Additionally, you can generate simulated earthquake catalogs using the ETAS (Epidemic-Type Aftershock Sequence) model and implement the declustering tool on synthetic catalogs. 
 This repository includes:
 <br/>
 <br/>
  - ``` Data/ ``` containing the catalogs of Southern California and New Zealand used in our study;
- - ``` Declustering Tools/ ``` containing the stochastic earthquake declustering algorithm and the algorithm that uses the Susceptibility Index for earthquake declustering;
- - ``` ETAS simulations/ ``` contains the code for generating ETAS catalogs;
+ - ``` Susceptibility Index/ ``` containing the algorithms that use the Susceptibility Index for earthquake declustering;
  - ``` Preprocess_tools/ ``` contains useful tools to prepare earthquake catalogs.
 ## Contact Info
 Please feel free to contact us for any questions or cooperation opportunities. We will be happy to help.
