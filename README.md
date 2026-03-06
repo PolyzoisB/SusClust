@@ -27,8 +27,8 @@ of the similarity matrix.<br/> Physica A: Statistical Mechanics and its
 Applications, 616, 128592. doi:*[10.1016/j.physa.2023.128592](https://doi.org/10.1016/j.physa.2023.128592)*
 <br/>
 <br/>
-Bountzis, P., Lippiello, E., Baccari, S., & Petrillo, G. (2025).;<br/> 
+Bountzis, P., Lippiello, E., Baccari, S., & Petrillo, G. (2026).;<br/> 
 Automatic earthquake declustering using the nearest-neighbor distance.<br/>
-Earth and Space Science, 12, e2025EA004539. 
+Earth and Space Science, 13, e2025EA004539. doi:*[10.1029/2025EA004539](https://agupubs.onlinelibrary.wiley.com/doi/10.1029/2025EA004539)*
 <br/>
 <br/>
