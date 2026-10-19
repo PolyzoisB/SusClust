@@ -1,153 +1,116 @@
-# Susceptibility Index (SI) for Earthquake Declustering
+# Susceptibility Index tool
 
-This folder is a self-contained tool that:
-1. Reads an earthquake catalog.
-2. Computes the Susceptibility Index (SI) using the Baiesi–Paczuski metric.
-3. Automatically selects an optimal similarity threshold (shifted minimum criterion).
-4. Outputs a declustered catalog (background vs triggered) and diagnostic files.
-5. Provides plotting scripts to reproduce key figures.
+This tool reads an earthquake catalog, computes nearest-neighbor similarities and the Susceptibility Index (SI), selects a threshold using a smoothed and shifted SI minimum, and labels retained events as background or triggered. It exports binary event labels, rather than a cluster assignment for every earthquake.
 
-## Folder layout
+## Build and run
 
-```
-Susceptibility Index/
-├─ global_parameters.f90
-├─ main_program.f90
-├─ randgen.f
-├─ datasets/
-│  └─ input_catalog.txt
-├─ results/
-│  ├─ susc_index.txt
-│  ├─ final_results.txt
-│  ├─ output_catalog.txt
-│  └─ rescaled_distances.txt
-└─ plots/
-   ├─ fig_1.py
-   └─ fig_2.py
-```
+Use GNU Fortran. From the repository root in Bash:
 
-## Requirements
-
-### Fortran
-- `gfortran` (tested with gfortran 9+)
-
-### Python (for plots only)
-- Python 3.9+
-- `numpy`, `pandas`, `matplotlib`, `scipy`
-
-Install (recommended in a venv):
 ```bash
-pip install numpy pandas matplotlib scipy
-```
-
-## Quickstart
-
-Run everything from **this** directory (`Susceptibility Index/`):
-
-### 1) Compile
-```bash
-gfortran -O3 global_parameters.f90 main_program.f90 randgen.f -o susceptibility.out
-```
-
-### 2) Run
-```bash
+cd "Susceptibility Index/Susceptibility Index tool"
+mkdir -p results
+gfortran -O3 global_parameters.f90 main_program.f90 -o susceptibility.out
 ./susceptibility.out
 ```
 
-This will read the input catalog from:
-- `datasets/input_catalog.txt`
+In PowerShell:
 
-and write outputs to:
-- `results/`
+```powershell
+Set-Location 'Susceptibility Index/Susceptibility Index tool'
+New-Item -ItemType Directory -Force -Path results | Out-Null
+gfortran -O3 global_parameters.f90 main_program.f90 -o susceptibility.exe
+.\susceptibility.exe
+```
 
-### 3) Make plots
+The build succeeds with GNU Fortran 10.3; the legacy `PAUSE` statement produces a warning. `randgen.f` is included in the command for consistency with the supplied sources, but no random-number routines are called by this tool.
+
+Keep the working directory at `Susceptibility Index/Susceptibility Index tool` when running the executable. `datasets/` and `results/` are relative to that directory. Create `results/` before running: the program does not create it. Each run replaces the four output files. There are no command-line arguments; configure the source and recompile.
+
+## Input catalog
+
+`datasets/input_catalog.txt` must contain four whitespace-separated numeric columns, with no header:
+
+| Column | Meaning | Units/convention |
+| --- | --- | --- |
+| 1 | Elapsed time from a chosen origin | Seconds |
+| 2 | Latitude | Degrees |
+| 3 | Longitude | Signed degrees; west is negative |
+| 4 | Magnitude | Earthquake magnitude |
+
+```text
+140589.219 36.04838 -118.29092 3.13
+```
+
+## Configuration
+
+Edit `global_parameters.f90` and rebuild:
+
+| Parameter | Default | Effect |
+| --- | --- | --- |
+| `input_file` | `datasets/input_catalog.txt` | Input path relative to the working directory |
+| `mcut` | `3.0` | Inclusive magnitude cutoff |
+| `df` | `1.6` | Spatial exponent in the nearest-neighbor metric |
+| `bval` | `1.0` | Fixed Gutenberg-Richter b-value used by the metric |
+| `pthmin`, `pthmax` | `1e-18`, `1e15` | Similarity threshold scan limits |
+| `bin0` | `0.05` | Natural-log threshold spacing |
+| `max_events` | `2000000` | Input-row reading limit and event-array capacity |
+| `max_thr` | `6000` | Index capacity of threshold arrays, from `-max_thr` to `max_thr` |
+| `max_points` | `10000` | SI curve-array capacity |
+| `rescaled_dist`, `susc_index_file_name`, `output_cat`, `final_results` | Paths under `results/` | Output destinations |
+
+
+## Metric and units
+
+For an event and an earlier event of magnitude `m`, the similarity is
+
+```text
+s = 1 / (dt_years * dr_km**df * 10**(-bval*m))
+T = dt_years * 10**(-bval*m/2)
+R = dr_km**df * 10**(-bval*m/2)
+T * R = 1 / s
+```
+
+## Output files
+
+All four files are whitespace-separated and headerless when produced by the current source.
+
+| File | Contents |
+| --- | --- |
+| `results/rescaled_distances.txt` | Two columns, `T R`, for each retained event after the first. The values come from the link that first reaches that event's highest similarity bin; within-bin ties are not resolved using the exact similarity. |
+| `results/susc_index.txt` | Six columns: `K SI NN Threshold ThresholdIndex Nlinks`. `K` is the algorithm's cluster-count estimate, `NN` counts strongest-link bins, `Threshold = exp(ThresholdIndex * bin0)`, and `Nlinks` counts links at that threshold. |
+| `results/final_results.txt` | One numeric row with the ten columns listed below. |
+| `results/output_catalog.txt` | Five columns: `time_seconds latitude longitude magnitude bg_id`, for the retained input events. `bg_id = 0` means background; `bg_id = 1` means triggered. The first retained event is always labeled background. |
+
+Exact `final_results.txt` column order:
+
+| Column | Meaning |
+| --- | --- |
+| 1 | `K_best`: cluster estimate at the shifted minimum |
+| 2 | Original SI value at `K_best` |
+| 3 | Similarity threshold at `K_best` |
+| 4 | `K_min`: cluster estimate at the unshifted minimum |
+| 5 | Original SI value at `K_min` |
+| 6 | Similarity threshold at `K_min` |
+| 7 | `K_leftPeak` |
+| 8 | Similarity threshold at the left peak |
+| 9 | `K_rightPeak` |
+| 10 | Similarity threshold at the right peak |
+
+The SI values written to this summary come from the original curve at the selected positions, even though smoothing is used to choose those positions. Background classification uses the selected log-bin threshold. Count `bg_id == 0` if you need the actual number of exported background events; the first event's handling means you should not assume that count equals `K_best`.
+
+## Plots
+
+Install NumPy, pandas, Matplotlib, and SciPy using `python -m pip install numpy pandas matplotlib scipy`; see the [root README](../../README.md#requirements) for a virtual environment example. Run from `plots/` after generating fresh Fortran results:
+
 ```bash
 cd plots
 python fig_1.py
 python fig_2.py
 ```
 
-Plots are saved into the `plots/` folder.
-
-## Input format
-
-The input file must be located at:
-
-- `datasets/input_catalog.txt`
-
-Each line must contain **four whitespace-separated columns**:
-
-1. `time_seconds` — elapsed time since origin (seconds)
-2. `latitude_deg`
-3. `longitude_deg`
-4. `magnitude`
-
-Example:
-```
-140589.219 36.04838 -118.29092 3.13
-```
-
-Notes:
-- Events with magnitude `< mcut` are ignored (`mcut` is defined in `global_parameters.f90`).
-- Lines with non-positive times are ignored.
-
-## Outputs (written to `results/`)
-
-### 1) `results/rescaled_distances.txt`
-Two columns per event (except the first event):
-- `maxdt(i)`: rescaled time distance in years
-- `maxdr(i)`: rescaled spatial distance in km
-
-These are associated with the **strongest link** of each event (largest similarity).
-
-### 2) `results/susc_index.txt`
-Columns:
-1. `K` — number of clusters
-2. `SI` — susceptibility index value
-3. `NN` — histogram count of strongest-link bins
-4. `Threshold` — similarity threshold value in 1/(years*km^df)
-5. `ThresholdIndex` — log-bin index (`ip`)
-6. `Nlinks` — total number of links at that threshold
-
-### 3) `results/final_results.txt`
-One line with:
-- `K_best` (shifted-minimum clusters), `SI_best`, `Thr(K_best)`,
-- `K_min`, `SI_min`, `Thr(K_min)`,
-- `K_leftPeak`, `Thr(K_leftPeak)`,
-- `K_rightPeak`, `Thr(K_rightPeak)`
-
-(Exact column ordering matches the Fortran write statement.)
-
-### 4) `results/output_catalog.txt`
-Final classified catalog with 5 columns:
-1. `time_seconds`
-2. `latitude_deg`
-3. `longitude_deg`
-4. `magnitude`
-5. `bg_id` — **0 = background**, **1 = triggered**
-
-## Parameters
-
-Edit `global_parameters.f90`:
-- `mcut` (magnitude cutoff)
-- `df` (fractal dimension)
-- `bval` (Gutenberg–Richter b-value, if you want it fixed)
-- `pthmin`, `pthmax`, `bin0` (threshold scan range and bin size)
-- `max_events` (max catalog size supported by fixed arrays)
-
-## Notes / common pitfalls
-
-- Run the executable from this folder so the relative paths resolve correctly.
-- Large catalogs are computationally expensive because the proximity computation is O(N²).
-- If you change the input format, update both the input file and the reading logic in `main_program.f90`.
+- `fig_1.py` reads `susc_index.txt`, `final_results.txt`, and `rescaled_distances.txt`. It saves `plots/Fig_1_SI.png`, showing a smoothed density of rescaled distances with the selected threshold, and the normalized SI curve and nearest-neighbor histogram.
+- `fig_2.py` reads `output_catalog.txt` and saves `plots/Fig_2.png`. It plots latitude against years since origin for retained and background events, with cumulative counts. Red markers show events with magnitude at least 6; that cutoff is in the script, and those markers are overlaid in both panels regardless of background classification.
 
 ## Citation
-If you use this tool in research, please cite the associated publications
 
-Lippiello, E., Baccari, S., & Bountzis, P. (2023).;
-Determining the number of clusters, before finding clusters, from the susceptibility of the similarity matrix.
-Physica A: Statistical Mechanics and its Applications, 616, 128592. doi:10.1016/j.physa.2023.128592
-
-Bountzis, P., Lippiello, E., Baccari, S., & Petrillo, G. (2026).;
-Automatic earthquake declustering using the nearest-neighbor distance.
-Earth and Space Science, 13, e2025EA004539.
+See the [root citation section](../../README.md#citation) and [CITATION.cff](../../CITATION.cff).

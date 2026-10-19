@@ -1,369 +1,342 @@
-program susceptibility_index  
-!*************************************************************************************************!
-!    Program with steps                                                                           !
-!    1. Import data with format [time, longitude, latitude, magnitude]                            !
-!    2. Compute Susceptibility index                                                              !
-!    3. Compute the minimum with smoothing algorithm                                              !                
-!    4. Exports i) Declustered catalog             ii) Susceptibility index                       ! 
-!               iii) Smoothing algorithm minimum   iv) Rescaled Distances                         !
-!*************************************************************************************************!
+program susceptibility_index
+  use iso_fortran_env, only: real64, int64
+  use ieee_arithmetic, only: ieee_is_finite
   use global_parameters
   implicit none
-        
-  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  integer :: i,ii,j,jj,n_event
-  real*8 :: time(max_events),mag(max_events),xxe(max_events),yye(max_events)
-  real*8 :: t,x,y,qe
-  !!!!! Susceptibility Index variables !!!!!
-  integer :: ipmin, ipmax,ip,kr(-max_thr:max_thr),nlink(-max_thr:max_thr),nd(-max_thr:max_thr)
-  integer :: ipmaxt,ipf,smooth_step
-  real*8 :: ixxx,iyyy,l1
-  real*8 :: zmexp
-    
-  !!!!! Minimum value variables !!!!!
-  real*8 :: zmin, sindex(max_points),zmin_shft,z_max1,z_max2 
-  real*8 :: z_min, zmax1,zmax2,thresh(max_events)
-  integer :: sw, num_points
-  integer :: k(max_points),kmin_shft,kmin,kmax,kmax2
-  
-  !!!!! METRICS !!!!
-  real(8) :: dt2,dr2,maxdt(max_events),maxdr(max_events)
-  integer :: id(max_events),id_pr(max_events),ip_thr
 
-  !!!!! Counter variables !!!!
-  integer :: unit_number
-  real(8) :: elapsed_time
-  real(8) :: mn_mag, b
-  
-  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  !!!                        IMPORT DATA                             !!!
-  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  open(35,file=input_file,status='old')
-  mn_mag = 0.    
-  jj=0
-  do ii=1,max_events
-    ! elapsed times since origin (seconds),latitude (deg), longitude (deg), magnitude
-    read(35,*,end=199)t,x,y,qe
-    if(t.gt.0) then
-      if(qe.ge.mcut)then
-        jj=jj+1
-        xxe(jj)=x
-        yye(jj)=y
-        time(jj)=t
-        mag(jj)=qe
-        mn_mag = mn_mag + qe
-      endif
+  integer, parameter :: dp = real64, derivative_step = 10
+  real(dp), parameter :: year_seconds = 365.25_dp*86400.0_dp
+  real(dp), parameter :: radians = acos(-1.0_dp)/180.0_dp
+  real(dp), parameter :: smoothing_fraction = 0.10_dp
+  real(dp), parameter :: tail_fraction = 0.02_dp
+  real(dp), parameter :: shift_fraction = 0.30_dp
+
+  ! True: shift used in both supplied scripts.
+  ! False: linear shift stated in the paper.
+  logical, parameter :: logarithmic_shift = .true.
+
+  real(dp), allocatable :: time(:), lat(:), lon(:), mag(:)
+  real(dp), allocatable :: phi(:), lambda(:), cos_phi(:), weight(:)
+  integer, allocatable :: parent_bin(:)
+
+  integer(int64), save :: links(-max_thr:max_thr)
+  integer(int64) :: delta_links
+  integer :: nn(-max_thr-1:max_thr), background(-max_thr:max_thr)
+  real(dp), save :: si(max_points), threshold(max_points)
+  integer :: k(max_points), bins(max_points)
+
+  integer :: n, np, ipmin, ipmax, ip, u, i, flag, nbg
+  integer :: best, valley, left_peak, right_peak
+
+  call read_catalog()
+
+  print *, 'Retained events:', n
+  print *, 'Metric b-value:', bval, '  df:', df
+
+  if (bin0 <= 0 .or. pthmin <= 0 .or. pthmax <= pthmin) &
+    error stop 'Invalid threshold settings'
+
+  ipmin = ceiling(log(pthmin)/bin0)
+  ipmax = floor(log(pthmax)/bin0)
+
+  if (ipmin < -max_thr .or. ipmax > max_thr) &
+    error stop 'Increase max_thr'
+  if (ipmax-ipmin <= derivative_step) &
+    error stop 'Threshold range too narrow'
+
+  call count_links()
+
+  ! Output: K, SI, NN, similarity threshold, bin index, link count.
+  open(newunit=u, file=susc_index_file_name, status='replace')
+
+  np = 0
+  do ip = ipmax, ipmin+derivative_step, -1
+    if (background(ip) <= 1) exit
+
+    delta_links = links(ip-derivative_step)-links(ip)
+    if (delta_links <= 0) cycle
+
+    if (np == max_points) error stop 'Increase max_points'
+    np = np+1
+
+    k(np) = background(ip)
+    bins(np) = ip
+    threshold(np) = exp(ip*bin0)
+
+    si(np) = real(background(ip)-background(ip-derivative_step), dp) &
+           / real(delta_links, dp)*real(links(ip), dp)/real(n, dp)
+
+    write(u, *) k(np), si(np), nn(ip), threshold(np), ip, links(ip)
+  end do
+  close(u)
+
+  call select_threshold()
+  ip = bins(best)
+
+  ! Output: time, latitude, longitude, magnitude, classification.
+  ! Classification: 0 = background, 1 = triggered.
+  open(newunit=u, file=output_cat, status='replace')
+
+  nbg = 0
+  do i = 1, n
+    flag = 0
+    if (i > 1) then
+      if (parent_bin(i) >= ip) flag = 1
     end if
-  enddo
-  199 close(35)
-  n_event = jj
-  mn_mag = mn_mag / (n_event*1d0)
-  b = log10(exp(1.))/(mn_mag-(mcut-0.05))
-  print*, "Number of events",n_event, "b-value (MLE): ", b
-    
-  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  !                                                        !
-  !                 SUSCEPTIBILITY INDEX                   ! 
-  !                                                        !
-  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    
-  !!!!!!!! Compute the proximities among elements !!!!!!!!!!
 
-  ipmin=int(dlog(pthmin)/bin0) ! Set minimum threshold index
-  ipmax=int(dlog(pthmax)/bin0) ! Set maximum threshold index
-  do ip=ipmin,ipmax
-      nlink(ip)=0
-      kr(ip)=0
-      nd(ip)=0
-  enddo
-  unit_number = 85
-  
-  open (unit_number,file=rescaled_dist,status="replace",action="write") 
-  ! Get the clock rate and start time
-  elapsed_time = 0.
-  !call SYSTEM_CLOCK(start_clock, rate)
-  do i=2,n_event  
-    ixxx=xxe(i)
-    iyyy=yye(i)
-    ipmaxt = ipmin
-    do j=i-1,1,-1
-      ! Compute similarity sij
-      call metric(l1,ixxx,iyyy,time(i),xxe(j),yye(j),time(j),mag(j),dt2,dr2)
-      if(int(dlog(l1)/bin0).lt.ipmin.or.int(dlog(l1)/bin0).gt.ipmax)then 
-        print*,int(dlog(l1)/bin0),'WARNING change limits'
-        print*,l1,ixxx,iyyy,time(i),xxe(j),yye(j),time(j),mag(j),dt2,dr2,i,j
-        pause
-      endif
-      ipf=max(ipmin,int(dlog(l1)/bin0)) ! find m1: sth(m1)>sij>sth(m1+1)    
-      if(ipf.gt.ipmaxt)then
-          maxdt(i)=dt2
-          maxdr(i)=dr2
-      endif
-      ipmaxt=max(ipf,ipmaxt)           ! find the maximum similarity s_i(max)  
-      do ip=ipmin,ipf
-          nlink(ip)=nlink(ip)+1
-      enddo 
-    enddo
-       
-    write(unit_number,*)maxdt(i),maxdr(i) ! in (years,km)
-    nd(ipmaxt) = nd(ipmaxt)+1
-    id_pr(i) = ipmaxt
-    do ip=ipmaxt+1,ipmax
-      kr(ip)=kr(ip)+1                      ! no links for sth>s_i(max)
-    enddo
-  enddo
-  close(unit_number)
-  close(15)
+    if (flag == 0) nbg = nbg+1
+    write(u, *) time(i), lat(i), lon(i), mag(i), flag
+  end do
+  close(u)
+
+  ! Preserve the repository's ten summary columns.
+  open(newunit=u, file=final_results, status='replace')
+  write(u, *) k(best), si(best), threshold(best), &
+              k(valley), si(valley), threshold(valley), &
+              k(left_peak), threshold(left_peak), &
+              k(right_peak), threshold(right_peak)
+  close(u)
+
+  print *, 'Background events:', nbg
+  print *, 'Similarity threshold:', threshold(best)
+
+contains
+
+  subroutine read_catalog()
+    integer :: unit, ios, pass, count
+    real(dp) :: row(4)
+
+    open(newunit=unit, file=input_file, status='old', action='read')
+
+    ! Count first, then allocate only as much memory as needed.
+    do pass = 1, 2
+      count = 0
+
+      do
+        read(unit, *, iostat=ios) row
+        if (ios < 0) exit
+        if (ios > 0) &
+          error stop 'Expected: time latitude longitude magnitude'
+
+        if (.not. all(ieee_is_finite(row))) &
+          error stop 'Non-finite input value'
+
+        if (row(4) < mcut) cycle
+
+        count = count+1
+        if (count > max_events) error stop 'Increase max_events'
+        if (pass == 1) cycle
+
+        time(count) = row(1)
+        lat(count) = row(2)
+        lon(count) = row(3)
+        mag(count) = row(4)
+
+        if (abs(lat(count)) > 90) error stop 'Invalid latitude'
+
+        if (count > 1) then
+          if (time(count) < time(count-1)) &
+            error stop 'Sort catalog by time'
+        end if
+      end do
+
+      if (pass == 1) then
+        n = count
+        if (n < 3) error stop 'Too few retained events for SI'
+        allocate(time(n), lat(n), lon(n), mag(n), parent_bin(n))
+        rewind(unit)
+      end if
+    end do
+
+    close(unit)
+  end subroutine read_catalog
 
 
-  !**********Compute and export the Susceptibility Index *************!
-  unit_number = 86
-  open (unit_number,file=susc_index_file_name,status="replace",action="write")
-  num_points = 0
-  smooth_step = 10
-  do ip=ipmax,ipmin+smooth_step,-1
-    if(kr(ip).eq.1)exit
-    if(nlink(ip-smooth_step).gt.nlink(ip))then
-      num_points = num_points + 1
-      k(num_points) = kr(ip)                         ! Number of clusters
-      zmexp=(kr(ip)-kr(ip-smooth_step))*1d0/(nlink(ip-smooth_step)-nlink(ip))
-      sindex(num_points) = zmexp*nlink(ip)*1./n_event ! SSM index
-      thresh(kr(ip)) =  exp(ip*bin0)                  ! Similarity threshold
-      !                 "Clusters",    "Susc index",      "NN" ,  "Threshold (years*km)", "Thr index", "No links"
-      write(unit_number,*)kr(ip)  ,  sindex(num_points), nd(ip),  exp(ip*bin0),    ip     ,  nlink(ip)
-    endif    
-  enddo
-  close(unit_number)
+  subroutine count_links()
+    integer :: event, parent, b, bmax, unit
+    real(dp) :: a, distance, dt, tr, rr, eta
+    real(dp) :: best_eta, best_t, best_r
 
-  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  !                                                        !
-  !                 FIND MINIMUM VALUE AND EXPORT          ! 
-  !                                                        !
-  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-   
-  !! Smoothing algorithm !!
-  call min_ssm_shft(num_points,sindex,k,kmin_shft,zmin_shft,sw,z_max1,z_max2,z_min,kmin,zmax1,kmax,zmax2,&
-                     kmax2,zmin)
+    ! Precompute quantities reused in many pair comparisons.
+    allocate(phi(n), lambda(n), cos_phi(n), weight(n))
+    phi = lat*radians
+    lambda = lon*radians
+    cos_phi = cos(phi)
+    weight = 10.0_dp**(-0.5_dp*bval*mag)
 
-  ! Open the file with the desired name
-  unit_number = 87
-  open(unit=unit_number, file=final_results, status='replace', action='write')
+    links = 0_int64
+    nn = 0
+    parent_bin = ipmin-1
 
-  ! Write the data to the file
-  write(unit_number, *) kmin_shft, zmin_shft, thresh(kmin_shft), kmin, z_min, thresh(kmin), &
-                           kmax, thresh(kmax), kmax2, thresh(kmax2)
-  ! Close the file
-  close(unit_number)
-    
-  !!!!!! Export catalog with id !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  unit_number = 88
-  open(unit=unit_number, file=output_cat, status='replace', action='write')
-  ip_thr = int(log(thresh(kmin_shft))/bin0)
-  id(1)=0
-  write(unit_number,*)time(1),xxe(1),yye(1),mag(1),id(1)
-  do i=2,n_event
-    if(id_pr(i).ge.ip_thr)then
-        id(i) = 1  ! triggered
-    elseif(id_pr(i).lt.ip_thr)then
-        id(i) = 0  ! background
-    endif
-    write(unit_number,*)time(i),xxe(i),yye(i),mag(i),id(i)
-  enddo
-  close(unit_number)
+    open(newunit=unit, file=rescaled_dist, status='replace')
 
-  contains
+    do event = 2, n
+      best_eta = huge(1.0_dp)
+      best_t = 0
+      best_r = 0
+      bmax = ipmin-1
 
-   subroutine metric(aaa,x1,y1,t1,x3,y3,t3,q3,dt_resc,dr_resc)
-      use global_parameters
-      implicit none
+      do parent = event-1, 1, -1
+        ! Haversine epicentral distance in kilometres.
+        a = sin(0.5_dp*(phi(event)-phi(parent)))**2 &
+          + cos_phi(event)*cos_phi(parent) &
+          * sin(0.5_dp*(lambda(event)-lambda(parent)))**2
 
-      real(8) :: aaa, dr, prob, dt, dt0, dt_resc, dr_resc
-      real(8) :: x1,y1,t1,x3,y3,t3,q3
-      real(8) :: pr, dr0
-      real(8) :: lat1,lat2,lon1,lon2,phi1,phi2,lambda1,lambda2
-      integer :: flag1
+        distance = 2.0_dp*6370.0_dp &
+                 * asin(sqrt(min(1.0_dp, max(0.0_dp, a))))
 
-      parameter(pr=3.141592653589793d0/180.d0)
+        dt = time(event)-time(parent)
 
-      dt0 = 1.d0
-      dr0 = 1d-3
+        ! Regularize equal times and identical locations independently.
+        if (dt <= 0) dt = 1.0_dp
+        if (distance <= 0) distance = 0.01_dp
 
-      if(x1.eq.x3.and.y1.eq.y3)then
-          x3=x3+dr0
-          y3=y3+dr0
-      endif
+        ! T is in years; R is in km**df; eta = T*R.
+        tr = (dt/year_seconds)*weight(parent)
+        rr = distance**df*weight(parent)
+        eta = tr*rr
 
-      lat1 = x1
-      lat2 = x3
-      lon1 = y1
-      lon2 = y3
+        ! Similarity = 1/eta.
+        ! FLOOR is necessary when the logarithm is negative.
+        b = floor(-log(eta)/bin0)
+        b = max(ipmin-1, min(ipmax, b))
 
-      phi1 = lat1 * pr
-      phi2 = lat2 * pr
-      lambda1 = lon1 * pr
-      lambda2 = lon2 * pr
+        if (b >= ipmin) links(b) = links(b)+1_int64
+        bmax = max(bmax, b)
 
-      dr = acos(sin(phi1)*sin(phi2)+cos(phi1)*cos(phi2)*cos(lambda1-lambda2))
-      dr = dr * 6370.d0      ! km
+        ! Keep the actual nearest neighbour, including within-bin ties.
+        if (eta < best_eta) then
+          best_eta = eta
+          best_t = tr
+          best_r = rr
+        end if
+      end do
 
-      dt = (t1 - t3)
+      parent_bin(event) = bmax
+      nn(bmax) = nn(bmax)+1
+      write(unit, *) best_t, best_r
+    end do
 
-      flag1 = 0
-      dr0 = 10.d0
-      if(dr.eq.0.d0.or.dt.eq.0.d0)flag1=1
-      dt = (dt + dt0*flag1)/(365.25d0*24.d0*3600.d0) ! years
-      dr = dr + dr0*flag1
-      ! 1/(years*km^df)
-      prob = 1.d0/(dt*(dr**df)*10.d0**(-bval*q3))
+    close(unit)
+    deallocate(phi, lambda, cos_phi, weight)
 
-      ! Rescale dt and dr
-      dt_resc = dt*(10.d0**(-bval*q3*0.5d0))
-      dr_resc = (dr**df)*(10.d0**(-bval*q3*0.5d0))
+    ! Accumulate numbers of pairs above each similarity threshold.
+    do b = ipmax-1, ipmin, -1
+      links(b) = links(b)+links(b+1)
+    end do
 
-      aaa = prob
+    ! The first event has no parent and is always background.
+    background(ipmin) = 1+nn(ipmin-1)
+    do b = ipmin+1, ipmax
+      background(b) = background(b-1)+nn(b-1)
+    end do
 
-   end subroutine metric
+    if (links(ipmax) > 0 .or. background(ipmin) > 1) &
+      print *, 'Note: consider widening pthmin/pthmax to cover all links.'
+  end subroutine count_links
 
-   subroutine min_ssm_shft(num_points,sindex,k,kmin_shft,zmin_shft,sw,z_max1,z_max2,z_min,kmin,zmax1,kmax,zmax2,&
-                              kmax2,zmin)
-      ! Compute the minimum of the SI and the shifted one by 30% based on the left peak of the curve
-      !
-      !! INPUT !! 
-      ! num_points: Number of thresholds,     sindex:     Susceptibility Index/threshold
-      ! k:          Number clusters/threshold
-      
-      !! OUTPUT !!
-      ! kmin_shft:  Number clusters-Shft min  zmin_shft:  Shifted SI
-      ! sw:         The final smoothing factor
-      ! z_max1:     SI value of 1st max       z_max2:     SI value of 2nd max
-      ! z_min:      SI value of the minimum   kmin:       K value of the minimum
-      ! zmax1:      Smoothed SI of 1st max    kmax:       K value of the 1st max
-      ! zmax2:      Smoothed SI of 2nd max    kmax2:      K value of the 2nd max
-      ! zmin:       Smoothed SI of minimum
-      !!!!!
 
-      implicit none
-      integer, parameter :: max_points = 10000 ! Adjust this to the maximum number of data points
-      real*8  :: sindex(max_points),smoothed_data(max_points) ! Adjust the data type (real or integer) as needed
-      real*8  :: zmin,zbest,zmax2,smooth_limit
-      integer :: maxima_indices(max_points),k(max_points)
-      integer :: minima_indices(max_points),kmax,kmax2,sw
-      integer :: num_maxima,num_minima,imax,imax2,imin,ibest
-      integer :: num_points, kmin,kmin_shft,tot_max
-      real*8 :: z_max1,z_max2,z_min
-      real*8 :: zmax1,min_min,max_max,zmin_shft
-      
-      smooth_limit = 0.10 ! 10% of the total number of points
-      tot_max = k(1)      ! maximum number of clusters
-      ! loop over smoothing step until 2 maximum 1 minimum are reached or end of iterations
-      do sw=2,int(num_points*smooth_limit) 
-         num_maxima=0
-         num_minima=0
-      
-         ! Apply the smoothing window from right to left of the SI curve
-         do i = 1+sw/2, num_points-sw/2
-            smoothed_data(i) = 0.0
-            do j=max(1,i-sw/2),min(num_points,i+sw/2)
-               smoothed_data(i) = smoothed_data(i)+sindex(j)
-            end do
-            smoothed_data(i)=smoothed_data(i)*1./sw
-         end do
-         ! Find all local maxima and minima in the smoothed data
-         do i = 1+sw/2, num_points-sw/2
-            ! neglect max's and min's that lie in the first and last 2% of total events
-            if(smoothed_data(i)>smoothed_data(i-1).and.&
-               smoothed_data(i)>smoothed_data(i + 1).and.&
-               k(i).gt.int(tot_max*0.02).and.k(i).lt.int(tot_max*0.98)&
-               )then
-               num_maxima = num_maxima + 1
-               maxima_indices(num_maxima)=i
-            elseif(smoothed_data(i)<smoothed_data(i-1).and.&
-               smoothed_data(i)<smoothed_data(i + 1).and.&
-               k(i).gt.int(tot_max*0.02).and.k(i).lt.int(tot_max*0.98)&
-               )then
-               num_minima = num_minima + 1
-               minima_indices(num_minima)=i
-            end if
-         end do
-         
-         ! Increase smoothing factor until the condition is reached
-         if(num_minima==1.and.num_maxima==2)then
+  subroutine select_threshold()
+    real(dp) :: prefix(0:np), smoothed(np), target
+    integer :: maxima(np), minima(np)
+    integer :: width, half, limit, lo, hi, j, nmax, nmin
+    logical :: found
 
-            imin=minima_indices(1)       ! index of minimum
-            zmin=smoothed_data(imin)     ! smoothed ssm_index
-            z_min = sindex(imin)         ! original ssm_index
-            kmin=k(imin)                 ! number of clusters
-                    
-            imax=maxima_indices(2)       ! index of max1 - left peak
-            kmax=k(imax)                 ! number of clusters for max1
-            zmax1=smoothed_data(imax)    ! smoothed ssm_index
-            z_max1 = sindex(imax)        ! original ssm_index
-         
-            imax2=maxima_indices(1)      ! index of max2 - right peak
-            kmax2=k(imax2)               ! num clusters for max2
-            zmax2=smoothed_data(imax2)   ! smoothed ssm_index
-            z_max2 = sindex(imax2)       ! original ssm_index
+    if (np < 5) &
+      error stop 'Too few SI points; inspect the SI output'
 
-            exit ! exit loop over smoothing factor
-         endif
-      
-         ! if smoothing limit is reached
-         if(sw.eq.int(num_points*smooth_limit))then
-            
-            ! find the global minimum
-            min_min=1E10
-            do i = 1, num_minima
-               if(smoothed_data(minima_indices(i)).lt.min_min)then
-                  min_min=smoothed_data(minima_indices(i))
-                  imin=minima_indices(i)
-               endif
-            end do
-            zmin=smoothed_data(imin)  ! smoothed ssm_index
-            kmin=k(imin)              ! number of clusters
-            z_min=sindex(imin)        ! original ssm_index
-         
-            ! find the right peak
-            max_max=-1
-            do i=1+sw/2,imin-1
-               if(smoothed_data(i).gt.max_max)then
-                  kmax2=k(i)
-                  max_max=smoothed_data(i)
-                  imax2=i
-               endif
-            enddo
-            zmax2=max_max             ! smoothed ssm_index - right peak
-            z_max2=sindex(imax2)      ! origianl ssm_index - right peak
+    ! Prefix sums make each moving-average evaluation inexpensive.
+    prefix(0) = 0
+    do j = 1, np
+      prefix(j) = prefix(j-1)+si(j)
+    end do
 
-            ! find left peak
-            max_max=-1
-            do i=imin+1,num_points-sw/2
-               if(smoothed_data(i).gt.max_max)then
-                  kmax=k(i)
-                  max_max=smoothed_data(i)
-                  imax=i
-               endif
-            enddo
-            zmax1=max_max            ! smoothed ssm_index - left peak
-            z_max1=sindex(imax)      ! original ssm_index - left peak
+    limit = min(np-2, max(3, int(smoothing_fraction*np)))
+    found = .false.
 
-            exit ! exit loop over smoothing factor
-     
-         endif
-      enddo
-      
-      ! Shift exponentialy//multiplicative the minimum 30% higher with respect to left peak - zmax1
-      zbest=exp(log(zmin)+(log(zmax1)-log(zmin))*0.3)
-      do i=imin,num_points-sw/2
-        if(smoothed_data(i).ge.zbest)then
-           ibest=i
-           exit
-        endif
-     enddo
+    do width = 3, limit, 2
+      half = width/2
+      lo = half+1
+      hi = np-half
 
-     kmin_shft = k(ibest)          ! num of clusters for shifted min
-     zmin_shft = sindex(ibest)     ! original ssm_index
+      do j = lo, hi
+        smoothed(j) = max(0.0_dp, &
+          (prefix(j+half)-prefix(j-half-1))/real(width, dp))
+      end do
 
-      
-   end subroutine min_ssm_shft
+      nmax = 0
+      nmin = 0
 
-end program
+      ! Both neighbours must have computed smoothing values.
+      do j = lo+1, hi-1
+        if (k(j) <= tail_fraction*n .or. &
+            k(j) >= (1-tail_fraction)*n) cycle
+
+        if (smoothed(j) > smoothed(j-1) .and. &
+            smoothed(j) > smoothed(j+1)) then
+          nmax = nmax+1
+          maxima(nmax) = j
+        end if
+
+        if (smoothed(j) < smoothed(j-1) .and. &
+            smoothed(j) < smoothed(j+1)) then
+          nmin = nmin+1
+          minima(nmin) = j
+        end if
+      end do
+
+      if (nmax == 2 .and. nmin == 1) then
+        if (maxima(1) < minima(1) .and. &
+            minima(1) < maxima(2)) then
+          valley = minima(1)
+          right_peak = maxima(1)
+          left_peak = maxima(2)
+          found = .true.
+          exit
+        end if
+      end if
+    end do
+
+    if (.not. found) then
+      ! Fallback: lowest detected interior local minimum.
+      if (nmin == 0) &
+        error stop 'No interior SI minimum; inspect the curve'
+
+      valley = minima(1)
+      do j = 2, nmin
+        if (smoothed(minima(j)) < smoothed(valley)) &
+          valley = minima(j)
+      end do
+
+      right_peak = lo-1+maxloc(smoothed(lo:valley-1), dim=1)
+      left_peak = valley+maxloc(smoothed(valley+1:hi), dim=1)
+
+      if (smoothed(right_peak) <= smoothed(valley) .or. &
+          smoothed(left_peak) <= smoothed(valley)) &
+        error stop 'No bracketed SI minimum; inspect the curve'
+
+      print *, 'Using the interior-minimum fallback.'
+    end if
+
+    if (logarithmic_shift) then
+      if (smoothed(valley) <= 0) &
+        error stop 'Logarithmic shift needs positive SI'
+
+      target = exp((1-shift_fraction)*log(smoothed(valley)) &
+                 + shift_fraction*log(smoothed(left_peak)))
+    else
+      target = smoothed(valley) &
+             + shift_fraction*(smoothed(left_peak)-smoothed(valley))
+    end if
+
+    ! K decreases with array index: move toward the smaller-K peak.
+    best = left_peak
+    do j = valley, left_peak
+      if (smoothed(j) >= target) then
+        best = j
+        exit
+      end if
+    end do
+  end subroutine select_threshold
+
+end program susceptibility_index
