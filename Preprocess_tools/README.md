@@ -28,7 +28,7 @@ Input must be chronological, headerless, and whitespace-separated:
 
 Output columns are **elapsed_seconds latitude longitude magnitude**, matching the SI reader's coordinate order. 
 
-Elapsed time is measured from the first input event, so the first output time is zero. All rows are retained, up to the configured `max_events` limit (2,000,000 by default); empty input stops with an error before writing output. The program does not sort events or validate calendar dates. Use valid Gregorian dates (years at least 1), one consistent time zone, and ordinary seconds; time zones and leap seconds are not handled.
+Elapsed time is measured from the first input event, so the first output time is zero. All rows are retained, up to the configured `max_events` limit (2,000,000 by default); empty input stops with an error before writing output. The program does not sort events or validate calendar dates. Use valid Gregorian dates (years at least 1), one consistent time zone, and ordinary seconds. 
 
 ## Build and run
 
